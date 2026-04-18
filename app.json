@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Chaghaf",
+    "slug": "chaghaf-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#BB3300"
+    },
+    "android": {
+      "package": "ma.chaghaf.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#BB3300"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "ma.chaghaf.app",
+      "buildNumber": "1.0.0"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7fe246c5-2721-4c44-9f49-3412a10224fa"
+      }
+    }
+  }
+}
