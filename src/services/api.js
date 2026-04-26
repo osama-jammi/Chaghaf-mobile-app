@@ -9,7 +9,6 @@ const STORAGE_KEYS = {
 };
 
 // ── Token helpers ─────────────────────────────────────────────────
-// ✅ APRÈS — remplacer toute la section TokenStorage
 export const TokenStorage = {
   getAccess:  () => AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
   getRefresh: () => AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
@@ -42,46 +41,63 @@ export const TokenStorage = {
   },
 };
 
-// ── Core fetch wrapper ────────────────────────────────────────────
-const AUTH_PUBLIC = ['/api/auth/login', '/api/auth/register'];
-
-async function request(endpoint, options = {}) {
-  const token = await TokenStorage.getAccess();
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
-
-  const { body, ...restOptions } = options;
-
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...restOptions,
-    headers,
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
-
-  // Session expirée / non authentifié — sauf sur login/register où on veut le vrai message
-  if ((response.status === 401 || response.status === 403) && !AUTH_PUBLIC.includes(endpoint)) {
-    await TokenStorage.clear();
-    throw new ApiError(response.status, 'Session expirée, veuillez vous reconnecter.');
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new ApiError(response.status, data.error || data.message || 'Erreur serveur');
-  }
-
-  return data;
-}
+// ── Session expiration callback (set by AuthContext) ─────────────
+let onSessionExpired = null;
+export const setSessionExpiredHandler = (fn) => { onSessionExpired = fn; };
 
 export class ApiError extends Error {
   constructor(status, message) {
     super(message);
     this.status = status;
   }
+}
+
+// ── Core fetch wrapper ────────────────────────────────────────────
+async function request(endpoint, options = {}) {
+  const token = await TokenStorage.getAccess();
+
+  const headers = {
+    'Content-Type': 'application/json',
+    Accept:         'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const { body, ...restOptions } = options;
+
+  let response;
+  try {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...restOptions,
+      headers,
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (e) {
+    throw new ApiError(0, 'Connexion impossible. Vérifiez votre réseau.');
+  }
+
+  // 204 No Content → pas de body, retourner null
+  if (response.status === 204) return null;
+
+  // Si 401/403 et qu'on AVAIT envoyé un token → token invalide → logout global
+  if ((response.status === 401 || response.status === 403) && token) {
+    await TokenStorage.clear();
+    if (onSessionExpired) onSessionExpired();
+    throw new ApiError(response.status, 'Session expirée, veuillez vous reconnecter.');
+  }
+
+  // Lecture du body (peut être vide ou non-JSON)
+  const text = await response.text();
+  let data;
+  try { data = text ? JSON.parse(text) : null; }
+  catch { data = null; }
+
+  if (!response.ok) {
+    const msg = (data && (data.error || data.message)) || `Erreur ${response.status}`;
+    throw new ApiError(response.status, msg);
+  }
+
+  return data;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────

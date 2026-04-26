@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
-import { AuthApi, TokenStorage } from '../services/api';
+import { AuthApi, TokenStorage, setSessionExpiredHandler } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -45,6 +45,12 @@ export function AuthProvider({ children }) {
         dispatch({ type: 'LOADED', user: null, token: null });
       }
     })();
+
+    // Quand un appel API détecte une session invalide, on dispatch LOGOUT
+    setSessionExpiredHandler(() => {
+      dispatch({ type: 'LOGOUT' });
+    });
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   const login = async (email, password, fcmToken) => {
