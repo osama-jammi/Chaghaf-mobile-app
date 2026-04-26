@@ -9,27 +9,43 @@ const STORAGE_KEYS = {
 };
 
 // ── Token helpers ─────────────────────────────────────────────────
+// ✅ APRÈS — remplacer toute la section TokenStorage
 export const TokenStorage = {
-  getAccess:    () => AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
-  getRefresh:   () => AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
-  setTokens:    (access, refresh) => Promise.all([
-    AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN,  access),
-    AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refresh),
-  ]),
-  clear:        () => Promise.all([
+  getAccess:  () => AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
+  getRefresh: () => AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+
+  setTokens: async (access, refresh) => {
+    const ops = [];
+    if (access != null)  ops.push(AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN,  String(access)));
+    else                 ops.push(AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN));
+    if (refresh != null) ops.push(AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, String(refresh)));
+    else                 ops.push(AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN));
+    return Promise.all(ops);
+  },
+
+  clear: () => Promise.all([
     AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
     AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
     AsyncStorage.removeItem(STORAGE_KEYS.USER),
   ]),
-  getUser:      async () => {
-    const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER);
-    return raw ? JSON.parse(raw) : null;
+
+  getUser: async () => {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
   },
-  setUser:      (user) => AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)),
+
+  setUser: (user) => {
+    if (user == null) return AsyncStorage.removeItem(STORAGE_KEYS.USER);
+    return AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  },
 };
 
 // ── Core fetch wrapper ────────────────────────────────────────────
-async function request(endpoint, options = {}, retry = true) {
+const AUTH_PUBLIC = ['/api/auth/login', '/api/auth/register'];
+
+async function request(endpoint, options = {}) {
   const token = await TokenStorage.getAccess();
 
   const headers = {
@@ -38,18 +54,18 @@ async function request(endpoint, options = {}, retry = true) {
     ...options.headers,
   };
 
+  const { body, ...restOptions } = options;
+
   const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
+    ...restOptions,
     headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
-  // Token expired → essaie de le rafraîchir une fois
-  if (response.status === 401 && retry) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return request(endpoint, options, false);
+  // Session expirée / non authentifié — sauf sur login/register où on veut le vrai message
+  if ((response.status === 401 || response.status === 403) && !AUTH_PUBLIC.includes(endpoint)) {
     await TokenStorage.clear();
-    throw new ApiError(401, 'Session expirée, veuillez vous reconnecter.');
+    throw new ApiError(response.status, 'Session expirée, veuillez vous reconnecter.');
   }
 
   const data = await response.json().catch(() => ({}));
@@ -59,27 +75,6 @@ async function request(endpoint, options = {}, retry = true) {
   }
 
   return data;
-}
-
-async function refreshAccessToken() {
-  try {
-    const refreshToken = await TokenStorage.getRefresh();
-    if (!refreshToken) return false;
-
-    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    if (!res.ok) return false;
-
-    const data = await res.json();
-    await TokenStorage.setTokens(data.accessToken, data.refreshToken);
-    await TokenStorage.setUser(data);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export class ApiError extends Error {

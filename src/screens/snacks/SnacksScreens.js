@@ -30,7 +30,7 @@ export function MenuSnacksScreen({ navigation }) {
 
   const totalItems = Object.values(cart).reduce((a, b) => a + b, 0);
   const totalPrice = Object.entries(cart).reduce((sum, [id, qty]) => {
-    const item = snacks.find(s => s.id === id);
+    const item = snacks.find(s => String(s.id) === String(id));
     return sum + (item?.price || 0) * qty;
   }, 0);
 
@@ -132,7 +132,7 @@ export function PanierScreen({ navigation, route }) {
   });
 
   const items = Object.entries(cart).map(([id, qty]) => ({
-    ...allSnacks.find(s => s.id === id), qty,
+    ...allSnacks.find(s => String(s.id) === String(id)), qty,
   })).filter(i => i.id);
 
   const total = items.reduce((s, i) => s + (i.price || 0) * i.qty, 0);
@@ -141,7 +141,7 @@ export function PanierScreen({ navigation, route }) {
     setLoading(true);
     setError(null);
     try {
-      const payload = items.map(i => ({ snackId: i.id, quantity: i.qty }));
+      const payload = items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.qty }));
       const order   = await SnackApi.createOrder(payload, note);
       navigation.navigate('SuiviCommande', { orderId: order.id ?? `CH-${Date.now()}`, total });
     } catch (e) {

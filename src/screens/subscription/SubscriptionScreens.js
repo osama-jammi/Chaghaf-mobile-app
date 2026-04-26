@@ -1,11 +1,12 @@
 // ─── Chaghaf · Subscription Screens v2 ──────────────────────────
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, RADIUS, TYPOGRAPHY, SHADOW } from '../../constants/colors';
 import { PACKS, USER } from '../../constants/data';
 import { Card, Badge, Button, Header, Icon, ProgressBar, Divider, Row } from '../../components';
+import { SubscriptionApi } from '../../services/api';
 
 // ══════════════════════════════════════════════════════════════════
 // Mon Abonnement
@@ -242,9 +243,24 @@ export function ChoixDureeScreen({ navigation, route }) {
 // ══════════════════════════════════════════════════════════════════
 export function RenouvellementScreen({ navigation, route }) {
   const [confirmed, setConfirmed] = useState(false);
+  const [loading, setLoading] = useState(false);
   const pack     = route?.params?.pack ?? PACKS[1];
   const duration = route?.params?.duration ?? 'monthly';
   const price    = duration === 'monthly' ? pack.monthlyPrice : pack.annualPrice;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      const backendDuration = duration === 'annual' ? 'YEAR' : 'MONTH';
+      const packType = pack.backendType ?? 'BASIC';
+      await SubscriptionApi.subscribe(packType, backendDuration);
+      setConfirmed(true);
+    } catch (err) {
+      Alert.alert('Erreur', err.message ?? 'Une erreur est survenue');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (confirmed) {
     return (
@@ -300,7 +316,12 @@ export function RenouvellementScreen({ navigation, route }) {
           ))}
         </Card>
 
-        <Button title="Confirmer le renouvellement" onPress={() => setConfirmed(true)} size="lg" />
+        <Button
+          title={loading ? 'Traitement en cours…' : 'Confirmer le renouvellement'}
+          onPress={handleConfirm}
+          disabled={loading}
+          size="lg"
+        />
         <Button title="Annuler" onPress={() => navigation.goBack()} variant="outlined" />
       </ScrollView>
     </SafeAreaView>
