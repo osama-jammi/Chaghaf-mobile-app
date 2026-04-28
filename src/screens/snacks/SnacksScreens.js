@@ -15,7 +15,7 @@ import { useFetch } from '../../hooks/useApi';
 // ══════════════════════════════════════════════════════════════════
 export function MenuSnacksScreen({ navigation }) {
   const [cart, setCart] = useState({});
-  const { data: catalog, loading } = useFetch(SnackApi.getCatalog, []);
+  const { data: catalog, loading, error: listError } = useFetch(SnackApi.getCatalog, []);
 
   const snacks     = catalog || [];
   const categories = [...new Set(snacks.map(s => s.category))];
@@ -58,8 +58,18 @@ export function MenuSnacksScreen({ navigation }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sn.scroll}>
+        {listError && (
+          <View style={sn.errorBox}>
+            <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
+            <Text style={sn.errorText}>{listError}</Text>
+          </View>
+        )}
         {loading ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+        ) : snacks.length === 0 && !listError ? (
+          <Text style={{ textAlign: 'center', color: COLORS.textSecondary, marginTop: 24 }}>
+            Aucun produit disponible pour le moment.
+          </Text>
         ) : (
           categories.map(cat => (
             <View key={cat}>

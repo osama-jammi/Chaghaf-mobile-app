@@ -48,15 +48,17 @@ export function ChoixBoissonScreen({ navigation }) {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState(null);
 
-  const { data: boissons, loading: loadingList } = useFetch(BoissonApi.getList, []);
+  const { data: boissons, loading: loadingList, error: listError } = useFetch(BoissonApi.getList, []);
+  const { data: status, refetch: refetchStatus } = useFetch(BoissonApi.getTodayStatus, []);
 
   const handleConfirm = async () => {
     if (!selected) return;
     setLoading(true);
     setError(null);
     try {
-      await BoissonApi.consume(selected.name);
-      navigation.navigate('ConfirmationBoisson', { boisson: selected });
+      const result = await BoissonApi.consume(selected.name);
+      navigation.navigate('ConfirmationBoisson', { boisson: selected, result });
+      refetchStatus && refetchStatus();
     } catch (e) {
       setError(e.message || 'Erreur lors de la sélection');
     } finally {
@@ -70,17 +72,35 @@ export function ChoixBoissonScreen({ navigation }) {
     <SafeAreaView style={b.safe} edges={['top']}>
       <Header title="Choisir votre boisson" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={b.scroll}>
-        <Text style={b.pageIntro}>Toutes les boissons sont incluses dans votre abonnement</Text>
+        {status && (
+          <Card style={{ backgroundColor: status.freeAvailable ? COLORS.successBg : COLORS.gray50 }}>
+            <Row center gap={10}>
+              <Icon
+                name={status.freeAvailable ? "gift-outline" : "wallet-outline"}
+                size={18}
+                color={status.freeAvailable ? COLORS.successText : COLORS.textSecondary}
+              />
+              <Text style={{ ...TYPOGRAPHY.smM, color: status.freeAvailable ? COLORS.successText : COLORS.textSecondary, flex: 1 }}>
+                {status.message}
+              </Text>
+            </Row>
+          </Card>
+        )}
+        <Text style={b.pageIntro}>1 boisson gratuite par jour · réinitialisée chaque matin à 7h</Text>
 
-        {error && (
+        {(error || listError) && (
           <View style={b.errorBox}>
             <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
-            <Text style={b.errorText}>{error}</Text>
+            <Text style={b.errorText}>{error || listError}</Text>
           </View>
         )}
 
         {loadingList ? (
           <ActivityIndicator color={COLORS.primary} style={{ marginTop: 24 }} />
+        ) : items.length === 0 && !listError ? (
+          <Text style={[b.pageIntro, { textAlign: 'center', marginTop: 24 }]}>
+            Aucune boisson disponible pour le moment.
+          </Text>
         ) : (
           <View style={b.boissonGrid}>
             {items.map(item => {
@@ -129,6 +149,9 @@ export function ChoixBoissonScreen({ navigation }) {
 // ══════════════════════════════════════════════════════════════════
 export function ConfirmationBoissonScreen({ navigation, route }) {
   const boisson = route?.params?.boisson;
+  const result  = route?.params?.result;
+  const isFree  = result?.free === true;
+  const price   = result?.price ?? 0;
   return (
     <SafeAreaView style={b.safe} edges={['top']}>
       <View style={b.confirmScreen}>
@@ -136,7 +159,11 @@ export function ConfirmationBoissonScreen({ navigation, route }) {
           <Icon name="checkmark" size={32} color={COLORS.white} />
         </View>
         <Text style={b.confirmTitle}>{boisson?.name}</Text>
-        <Text style={b.confirmSub}>Votre boisson a été enregistrée. Bonne dégustation !</Text>
+        <Text style={b.confirmSub}>
+          {isFree
+            ? 'Boisson offerte (1ère du jour) — bonne dégustation !'
+            : `Boisson facturée: ${price} dh — bonne dégustation !`}
+        </Text>
 
         {boisson?.name?.toLowerCase().includes('café') && (
           <TouchableOpacity style={b.guideBtn} onPress={() => navigation.navigate('GuideMachine')}>

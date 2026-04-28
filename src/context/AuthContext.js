@@ -32,17 +32,34 @@ function reducer(state, action) {
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Restaurer la session au démarrage
+  // Restaurer la session au démarrage + valider le token via /api/auth/me
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const [user, token] = await Promise.all([
+        const [storedUser, token] = await Promise.all([
           TokenStorage.getUser(),
           TokenStorage.getAccess(),
         ]);
-        dispatch({ type: 'LOADED', user, token });
+
+        // Pas de token → pas connecté
+        if (!token) {
+          if (!cancelled) dispatch({ type: 'LOADED', user: null, token: null });
+          return;
+        }
+
+        // Token présent → on le valide auprès du backend
+        try {
+          const profile = await AuthApi.getProfile();
+          const merged = { ...(storedUser || {}), ...(profile || {}) };
+          if (!cancelled) dispatch({ type: 'LOADED', user: merged, token });
+        } catch (err) {
+          // Token invalide/expiré → on nettoie silencieusement (pas de message)
+          await TokenStorage.clear();
+          if (!cancelled) dispatch({ type: 'LOADED', user: null, token: null });
+        }
       } catch {
-        dispatch({ type: 'LOADED', user: null, token: null });
+        if (!cancelled) dispatch({ type: 'LOADED', user: null, token: null });
       }
     })();
 
@@ -50,7 +67,10 @@ export function AuthProvider({ children }) {
     setSessionExpiredHandler(() => {
       dispatch({ type: 'LOGOUT' });
     });
-    return () => setSessionExpiredHandler(null);
+    return () => {
+      cancelled = true;
+      setSessionExpiredHandler(null);
+    };
   }, []);
 
   const login = async (email, password, fcmToken) => {

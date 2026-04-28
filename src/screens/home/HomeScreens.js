@@ -11,7 +11,24 @@ import { COLORS, RADIUS, TYPOGRAPHY, SHADOW } from '../../constants/colors';
 import { Card, Row, Badge, Avatar, StatCard, Button, EmptyState, LoadingScreen, Icon, ProgressBar, Header } from '../../components';
 import { useAuth } from '../../context/AuthContext';
 import { useFetch ,useMutation  } from '../../hooks/useApi';
-import { SubscriptionApi, NotificationApi } from '../../services/api';
+import { SubscriptionApi, NotificationApi, AccessApi } from '../../services/api';
+
+const formatPack = (p) => {
+  const map = { BASIC: 'Basique', PREMIUM: 'Premium', VIP: 'VIP', STUDENT: 'Étudiant' };
+  return map[p] || p || '—';
+};
+const formatDuration = (d) => {
+  const map = { WEEK: 'Hebdomadaire', WEEKLY: 'Hebdomadaire',
+                MONTH: 'Mensuel', MONTHLY: 'Mensuel',
+                QUARTER: 'Trimestriel', QUARTERLY: 'Trimestriel',
+                YEAR: 'Annuel', YEARLY: 'Annuel', ANNUAL: 'Annuel' };
+  return map[d] || d || '';
+};
+const maxDaysFor = (d) => {
+  const map = { WEEK: 7, WEEKLY: 7, MONTH: 30, MONTHLY: 30,
+                QUARTER: 90, QUARTERLY: 90, YEAR: 365, YEARLY: 365, ANNUAL: 365 };
+  return map[d] || 30;
+};
 
 // ══════════════════════════════════════════════════════════════════
 // Dashboard
@@ -24,6 +41,7 @@ export function HomeScreen({ navigation }) {
   );
   const { data: notifData } = useFetch(NotificationApi.getUnreadCount, []);
   const unreadCount = notifData?.count ?? 0;
+  const { data: occupancy } = useFetch(AccessApi.getOccupancy, []);
 
   const firstName = user?.fullName?.split(' ')[0] ?? 'Membre';
 
@@ -48,7 +66,7 @@ export function HomeScreen({ navigation }) {
           </View>
         </View>
         <View style={h.topActions}>
-          <TouchableOpacity style={h.iconBtn} onPress={() => {}}>
+          <TouchableOpacity style={h.iconBtn} onPress={() => navigation.navigate('Notifications')}>
             <Icon name="notifications-outline" size={20} color={COLORS.textPrimary} />
             {unreadCount > 0 && <View style={h.notifDot} />}
           </TouchableOpacity>
@@ -81,7 +99,7 @@ export function HomeScreen({ navigation }) {
                 <View>
                   <Text style={h.subLabel}>Abonnement actif</Text>
                   <Text style={h.subName}>
-                    Pack {sub.packType?.replace('_', ' ')} · {sub.duration === 'MONTHLY' ? 'Mensuel' : 'Annuel'}
+                    Pack {formatPack(sub.packType)} · {formatDuration(sub.duration)}
                   </Text>
                 </View>
                 <View style={h.subIconBox}>
@@ -91,7 +109,7 @@ export function HomeScreen({ navigation }) {
 
               <ProgressBar
                 value={sub.daysLeft ?? 0}
-                max={sub.duration === 'MONTHLY' ? 30 : 365}
+                max={maxDaysFor(sub.duration)}
                 color="rgba(255,255,255,0.8)"
                 height={3}
                 style={{ backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 16 }}
@@ -175,11 +193,15 @@ export function HomeScreen({ navigation }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={h.occupTitle}>Occupation de l'espace</Text>
-              <Text style={h.occupStatus}>Calme · Bonne disponibilité</Text>
+              <Text style={h.occupStatus}>
+                {occupancy
+                  ? `${occupancy.status} · ${occupancy.currentCount}/${occupancy.maxCapacity} personnes`
+                  : 'Chargement...'}
+              </Text>
             </View>
-            <Text style={h.occupPct}>65%</Text>
+            <Text style={h.occupPct}>{occupancy?.percent ?? 0}%</Text>
           </View>
-          <ProgressBar value={65} color={COLORS.info} height={5} style={{ marginTop: 12 }} />
+          <ProgressBar value={occupancy?.percent ?? 0} max={100} color={COLORS.info} height={5} style={{ marginTop: 12 }} />
         </Card>
 
         {/* Stats */}
@@ -307,6 +329,16 @@ const h = StyleSheet.create({
 export function QRCodeScreen({ navigation }) {
   const { user } = useAuth();
   const { data: sub } = useFetch(SubscriptionApi.getActive, [], { initialData: null });
+  const QRCode = require('react-native-qrcode-svg').default;
+
+  // Le QR contient: id + token signé (l'ERP scanne et envoie au backend pour valider)
+  const qrPayload = JSON.stringify({
+    type: 'CHAGHAF_USER',
+    userId: user?.userId,
+    email: user?.email,
+    name: user?.fullName,
+    issuedAt: Date.now(),
+  });
 
   return (
     <SafeAreaView style={qr.safe} edges={['top']}>
@@ -320,7 +352,7 @@ export function QRCodeScreen({ navigation }) {
             <View style={{ flex: 1 }}>
               <Text style={qr.userName}>{user?.fullName}</Text>
               <Text style={qr.userRole}>
-                {sub ? `Pack ${sub.packType?.replace('_', ' ')}` : 'Sans abonnement'}
+                {sub ? `Pack ${formatPack(sub.packType)}` : 'Sans abonnement'}
               </Text>
             </View>
             <Badge
@@ -336,7 +368,14 @@ export function QRCodeScreen({ navigation }) {
           <View style={qr.qrFrame}>
             <View style={qr.qrCornerTL} /><View style={qr.qrCornerTR} />
             <View style={qr.qrCornerBL} /><View style={qr.qrCornerBR} />
-            <Icon name="qr-code-outline" size={140} color={COLORS.textPrimary} />
+            <View style={{ backgroundColor: '#fff', padding: 8, borderRadius: 8 }}>
+              <QRCode
+                value={qrPayload}
+                size={180}
+                backgroundColor="#fff"
+                color={COLORS.textPrimary}
+              />
+            </View>
           </View>
           <View style={qr.qrMeta}>
             <Text style={qr.qrId}>ID · {user?.userId ?? 'CH-0001'}</Text>
@@ -345,7 +384,7 @@ export function QRCodeScreen({ navigation }) {
               {new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
             </Text>
           </View>
-          <Text style={qr.qrNote}>Code renouvelé à chaque utilisation</Text>
+          <Text style={qr.qrNote}>Présentez ce code à la réception pour scanner</Text>
         </Card>
 
         {/* Instructions */}

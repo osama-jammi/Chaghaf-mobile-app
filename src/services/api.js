@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'https://chaghaf-back-5t0i.onrender.com';
+const BASE_URL = 'https://app-chaghaf.salmondune-842043fe.francecentral.azurecontainerapps.io';
 
 const STORAGE_KEYS = {
   ACCESS_TOKEN:  'chaghaf_access_token',
@@ -55,6 +55,7 @@ export class ApiError extends Error {
 // ── Core fetch wrapper ────────────────────────────────────────────
 async function request(endpoint, options = {}) {
   const token = await TokenStorage.getAccess();
+  const method = options.method || 'GET';
 
   const headers = {
     'Content-Type': 'application/json',
@@ -65,6 +66,8 @@ async function request(endpoint, options = {}) {
 
   const { body, ...restOptions } = options;
 
+  console.log(`[API] → ${method} ${endpoint}${token ? ' [AUTH]' : ''}`);
+
   let response;
   try {
     response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -73,18 +76,14 @@ async function request(endpoint, options = {}) {
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch (e) {
+    console.log(`[API] ✗ ${method} ${endpoint} — network error:`, e?.message);
     throw new ApiError(0, 'Connexion impossible. Vérifiez votre réseau.');
   }
 
+  console.log(`[API] ← ${response.status} ${method} ${endpoint}`);
+
   // 204 No Content → pas de body, retourner null
   if (response.status === 204) return null;
-
-  // Si 401/403 et qu'on AVAIT envoyé un token → token invalide → logout global
-  if ((response.status === 401 || response.status === 403) && token) {
-    await TokenStorage.clear();
-    if (onSessionExpired) onSessionExpired();
-    throw new ApiError(response.status, 'Session expirée, veuillez vous reconnecter.');
-  }
 
   // Lecture du body (peut être vide ou non-JSON)
   const text = await response.text();
@@ -92,8 +91,17 @@ async function request(endpoint, options = {}) {
   try { data = text ? JSON.parse(text) : null; }
   catch { data = null; }
 
+  // Si 401/403 et qu'on AVAIT envoyé un token → token invalide → logout global
+  if ((response.status === 401 || response.status === 403) && token) {
+    console.log(`[API] Token rejeté par le backend (${response.status}). Body:`, text);
+    await TokenStorage.clear();
+    if (onSessionExpired) onSessionExpired();
+    throw new ApiError(response.status, 'Session expirée, veuillez vous reconnecter.');
+  }
+
   if (!response.ok) {
     const msg = (data && (data.error || data.message)) || `Erreur ${response.status}`;
+    console.log(`[API] ✗ ${method} ${endpoint} body:`, text.substring(0, 300));
     throw new ApiError(response.status, msg);
   }
 
@@ -101,19 +109,36 @@ async function request(endpoint, options = {}) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────
+const extractToken = (data) =>
+  data?.accessToken || data?.access_token || data?.token || data?.jwt || data?.idToken || null;
+
 export const AuthApi = {
   register: async (payload) => {
     const data = await request('/api/auth/register', { method: 'POST', body: payload });
-    await TokenStorage.setTokens(data.accessToken, data.refreshToken);
-    await TokenStorage.setUser(data);
-    return data;
+    console.log('[Auth] register response keys:', data ? Object.keys(data) : 'null');
+    const token = extractToken(data);
+    if (!token) {
+      console.log('[Auth] ⚠ Aucun token dans la réponse register:', JSON.stringify(data));
+      throw new ApiError(500, "Réponse invalide du serveur (pas de token).");
+    }
+    await TokenStorage.setTokens(token, data.refreshToken);
+    await TokenStorage.setUser({ ...data, accessToken: token });
+    console.log('[Auth] register OK, token stored (', token.substring(0, 20), '...)');
+    return { ...data, accessToken: token };
   },
 
   login: async (payload) => {
     const data = await request('/api/auth/login', { method: 'POST', body: payload });
-    await TokenStorage.setTokens(data.accessToken, data.refreshToken);
-    await TokenStorage.setUser(data);
-    return data;
+    console.log('[Auth] login response keys:', data ? Object.keys(data) : 'null');
+    const token = extractToken(data);
+    if (!token) {
+      console.log('[Auth] ⚠ Aucun token dans la réponse login:', JSON.stringify(data));
+      throw new ApiError(500, "Réponse invalide du serveur (pas de token).");
+    }
+    await TokenStorage.setTokens(token, data.refreshToken);
+    await TokenStorage.setUser({ ...data, accessToken: token });
+    console.log('[Auth] login OK, token stored (', token.substring(0, 20), '...)');
+    return { ...data, accessToken: token };
   },
 
   logout: async () => {
@@ -136,6 +161,12 @@ export const SubscriptionApi = {
   renew:            () => request('/api/subscriptions/renew', { method: 'POST' }),
   purchaseDayAccess:(accessType) =>
     request('/api/subscriptions/day-access', { method: 'POST', body: { accessType } }),
+  requestChange:    (requestedPack, requestedDuration, reason) =>
+    request('/api/subscriptions/change-request', {
+      method: 'POST',
+      body: { requestedPack, requestedDuration, reason },
+    }),
+  myChangeRequests: () => request('/api/subscriptions/change-requests/me'),
 };
 
 // ── Reservations ──────────────────────────────────────────────────
@@ -152,11 +183,12 @@ export const ReservationApi = {
 
 // ── Boissons ──────────────────────────────────────────────────────
 export const BoissonApi = {
-  getList:    () => request('/api/boissons'),
-  consume:    (boissonType) =>
+  getList:        () => request('/api/boissons'),
+  consume:        (boissonType) =>
     request('/api/boissons/consume', { method: 'POST', body: { boissonType } }),
-  getHistory: () => request('/api/boissons/history'),
-  getCafeGuide: () => request('/api/boissons/cafe-guide'),
+  getHistory:     () => request('/api/boissons/history'),
+  getCafeGuide:   () => request('/api/boissons/cafe-guide'),
+  getTodayStatus: () => request('/api/boissons/today-status'),
 };
 
 // ── Snacks ────────────────────────────────────────────────────────
@@ -188,4 +220,13 @@ export const NotificationApi = {
   getAll:         (page = 0) => request(`/api/notifications?page=${page}`),
   getUnreadCount: () => request('/api/notifications/unread-count'),
   markAllRead:    () => request('/api/notifications/mark-read', { method: 'POST' }),
+};
+
+// ── Access (check-in/out, occupation) ─────────────────────────────
+export const AccessApi = {
+  getOccupancy: () => request('/api/access/occupancy'),
+  checkIn:      (qrToken) => request('/api/access/check-in', { method: 'POST', body: { qrToken } }),
+  checkOut:     () => request('/api/access/check-out', { method: 'POST' }),
+  myStatus:     () => request('/api/access/my-status'),
+  getQrToken:   () => request('/api/access/qr-token'),
 };

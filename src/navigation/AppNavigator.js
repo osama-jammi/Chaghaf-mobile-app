@@ -14,6 +14,7 @@ import { SplashScreen, OnboardingScreen, LoginScreen, RegisterScreen } from '../
 
 // ── Home screens ──────────────────────────────────────────────────
 import { HomeScreen, QRCodeScreen, AccesJourneeScreen } from '../screens/home/HomeScreens';
+import { NotificationsScreen } from '../screens/home/NotificationsScreen';
 
 // ── Subscription ──────────────────────────────────────────────────
 import { AbonnementScreen, ChoixDureeScreen, RenouvellementScreen } from '../screens/subscription/SubscriptionScreens';
@@ -51,6 +52,7 @@ function HomeStack() {
       <Stack.Screen name="ChoixDuree"    component={ChoixDureeScreen} />
       <Stack.Screen name="Renouvellement" component={RenouvellementScreen} />
       <Stack.Screen name="Profile"       component={ProfilScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
