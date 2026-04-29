@@ -68,7 +68,13 @@ export function HomeScreen({ navigation }) {
         <View style={h.topActions}>
           <TouchableOpacity style={h.iconBtn} onPress={() => navigation.navigate('Notifications')}>
             <Icon name="notifications-outline" size={20} color={COLORS.textPrimary} />
-            {unreadCount > 0 && <View style={h.notifDot} />}
+            {unreadCount > 0 && (
+              <View style={h.notifBadge}>
+                <Text style={h.notifBadgeText}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={h.iconBtn} onPress={() => navigation.navigate('Profile')}>
             <Icon name="person-outline" size={20} color={COLORS.textPrimary} />
@@ -249,12 +255,15 @@ const h = StyleSheet.create({
     width: 36, height: 36, borderRadius: RADIUS.md,
     backgroundColor: COLORS.gray50, alignItems: 'center', justifyContent: 'center',
   },
-  notifDot: {
-    position: 'absolute', top: 7, right: 7,
-    width: 8, height: 8, borderRadius: 4,
+  notifBadge: {
+    position: 'absolute', top: -3, right: -3,
+    minWidth: 18, height: 18, paddingHorizontal: 4,
+    borderRadius: 9,
     backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
     borderWidth: 1.5, borderColor: COLORS.surface,
   },
+  notifBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   scroll:     { padding: 16, gap: 12, paddingBottom: 32 },
   sectionLabel: { ...TYPOGRAPHY.label, color: COLORS.textTertiary, marginBottom: 10, marginTop: 4 },
 
@@ -329,6 +338,7 @@ const h = StyleSheet.create({
 export function QRCodeScreen({ navigation }) {
   const { user } = useAuth();
   const { data: sub } = useFetch(SubscriptionApi.getActive, [], { initialData: null });
+  const { data: occupancy } = useFetch(AccessApi.getOccupancy, []);
   const QRCode = require('react-native-qrcode-svg').default;
 
   // Le QR contient: id + token signé (l'ERP scanne et envoie au backend pour valider)
@@ -387,6 +397,33 @@ export function QRCodeScreen({ navigation }) {
           <Text style={qr.qrNote}>Présentez ce code à la réception pour scanner</Text>
         </Card>
 
+        {/* Occupation actuelle de l'espace (mis à jour au scan) */}
+        <Card>
+          <Row center gap={12}>
+            <View style={qr.occIconBox}>
+              <Icon name="people-outline" size={18} color={COLORS.info} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={qr.occTitle}>Place dans l'espace</Text>
+              <Text style={qr.occSub}>
+                {occupancy
+                  ? `${occupancy.currentCount}/${occupancy.maxCapacity ?? 30} personnes — ${occupancy.percent ?? 0}%`
+                  : '—/30 personnes'}
+              </Text>
+            </View>
+            <Text style={qr.occBig}>
+              {occupancy ? `${occupancy.currentCount}/${occupancy.maxCapacity ?? 30}` : '0/30'}
+            </Text>
+          </Row>
+          <ProgressBar
+            value={occupancy?.percent ?? 0}
+            max={100}
+            color={COLORS.info}
+            height={4}
+            style={{ marginTop: 10 }}
+          />
+        </Card>
+
         {/* Instructions */}
         <Card>
           <Text style={qr.howTitle}>Comment utiliser</Text>
@@ -432,6 +469,10 @@ const qr = StyleSheet.create({
   howRow:   { paddingVertical: 12 },
   howIcon:  { width: 34, height: 34, borderRadius: RADIUS.sm, backgroundColor: COLORS.primarySoft, alignItems: 'center', justifyContent: 'center' },
   howText:  { ...TYPOGRAPHY.sm, color: COLORS.textPrimary, flex: 1 },
+  occIconBox: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: COLORS.infoBg, alignItems: 'center', justifyContent: 'center' },
+  occTitle: { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '600' },
+  occSub:   { ...TYPOGRAPHY.xs, color: COLORS.textTertiary, marginTop: 2 },
+  occBig:   { ...TYPOGRAPHY.h4, color: COLORS.info },
 });
 
 // ══════════════════════════════════════════════════════════════════

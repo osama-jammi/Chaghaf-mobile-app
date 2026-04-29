@@ -1,12 +1,13 @@
-// ─── Chaghaf · Design System v2 ─────────────────────────────────
-// Clean, minimal, professional
+// ─── Chaghaf · Design System v2.1 ───────────────────────────────
+// Clean, minimal, professional — refresh 2026
 
 export const COLORS = {
-  // Brand
-  primary:      '#C0392B',
-  primaryDark:  '#922B21',
-  primaryLight: '#E74C3C',
-  primarySoft:  '#FDEDEC',
+  // Brand — légèrement plus chaleureux et moderne
+  primary:        '#B83227',
+  primaryDark:    '#7E1F17',
+  primaryLight:   '#E85949',
+  primarySoft:    '#FCE9E6',
+  primaryAccent:  '#F39C8E',  // accent doux pour highlights
 
   // Neutrals
   black:        '#0A0A0A',
@@ -73,11 +74,11 @@ export const COLORS = {
 };
 
 export const RADIUS = {
-  xs:   4,
-  sm:   8,
-  md:   12,
-  lg:   16,
-  xl:   20,
+  xs:   6,
+  sm:   10,
+  md:   14,
+  lg:   18,
+  xl:   22,
   xxl:  28,
   full: 9999,
 };
