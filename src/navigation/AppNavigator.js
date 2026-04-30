@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -9,29 +9,14 @@ import { COLORS, RADIUS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 import { LoadingScreen } from '../components';
 
-// ── Auth screens ──────────────────────────────────────────────────
 import { SplashScreen, OnboardingScreen, LoginScreen, RegisterScreen } from '../screens/auth/AuthScreens';
-
-// ── Home screens ──────────────────────────────────────────────────
 import { HomeScreen, QRCodeScreen, AccesJourneeScreen } from '../screens/home/HomeScreens';
 import { NotificationsScreen } from '../screens/home/NotificationsScreen';
-
-// ── Subscription ──────────────────────────────────────────────────
 import { AbonnementScreen, ChoixDureeScreen, RenouvellementScreen } from '../screens/subscription/SubscriptionScreens';
-
-// ── Reservation ───────────────────────────────────────────────────
 import { ChoixSalleScreen, DateDureeScreen, ConfirmationReservationScreen } from '../screens/reservation/ReservationScreens';
-
-// ── Boissons ──────────────────────────────────────────────────────
 import { ValidationBoissonScreen, ChoixBoissonScreen, GuideMachineScreen, ConfirmationBoissonScreen } from '../screens/boissons/BoissonScreens';
-
-// ── Snacks ────────────────────────────────────────────────────────
 import { MenuSnacksScreen, PanierScreen, SuiviCommandeScreen } from '../screens/snacks/SnacksScreens';
-
-// ── Social ────────────────────────────────────────────────────────
 import { PostsScreen, CreerPostScreen, MessagesScreen, ConversationScreen } from '../screens/social/SocialScreens';
-
-// ── Profile ───────────────────────────────────────────────────────
 import { ProfilScreen } from '../screens/profile/ProfilScreen';
 
 const Stack = createStackNavigator();
@@ -39,20 +24,19 @@ const Tab   = createBottomTabNavigator();
 
 const noHeader = { headerShown: false };
 
-// ══════════════════════════════════════════════════════════════════
-// Stacks
-// ══════════════════════════════════════════════════════════════════
+const TAB_BAR_HEIGHT = Platform.OS === 'ios' ? 80 : 60;
+
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={noHeader}>
-      <Stack.Screen name="Home"          component={HomeScreen} />
-      <Stack.Screen name="QRCode"        component={QRCodeScreen} />
-      <Stack.Screen name="AccesJournee"  component={AccesJourneeScreen} />
-      <Stack.Screen name="Abonnement"    component={AbonnementScreen} />
-      <Stack.Screen name="ChoixDuree"    component={ChoixDureeScreen} />
+      <Stack.Screen name="Home"           component={HomeScreen} />
+      <Stack.Screen name="QRCode"         component={QRCodeScreen} />
+      <Stack.Screen name="AccesJournee"   component={AccesJourneeScreen} />
+      <Stack.Screen name="Abonnement"     component={AbonnementScreen} />
+      <Stack.Screen name="ChoixDuree"     component={ChoixDureeScreen} />
       <Stack.Screen name="Renouvellement" component={RenouvellementScreen} />
-      <Stack.Screen name="Profile"       component={ProfilScreen} />
-      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Profile"        component={ProfilScreen} />
+      <Stack.Screen name="Notifications"  component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
@@ -70,10 +54,10 @@ function ReservationStack() {
 function BoissonStack() {
   return (
     <Stack.Navigator screenOptions={noHeader}>
-      <Stack.Screen name="ValidationBoisson"  component={ValidationBoissonScreen} />
-      <Stack.Screen name="ChoixBoisson"       component={ChoixBoissonScreen} />
+      <Stack.Screen name="ValidationBoisson"   component={ValidationBoissonScreen} />
+      <Stack.Screen name="ChoixBoisson"        component={ChoixBoissonScreen} />
       <Stack.Screen name="ConfirmationBoisson" component={ConfirmationBoissonScreen} />
-      <Stack.Screen name="GuideMachine"       component={GuideMachineScreen} />
+      <Stack.Screen name="GuideMachine"        component={GuideMachineScreen} />
     </Stack.Navigator>
   );
 }
@@ -81,8 +65,8 @@ function BoissonStack() {
 function SnacksStack() {
   return (
     <Stack.Navigator screenOptions={noHeader}>
-      <Stack.Screen name="MenuSnacks"   component={MenuSnacksScreen} />
-      <Stack.Screen name="Panier"       component={PanierScreen} />
+      <Stack.Screen name="MenuSnacks"    component={MenuSnacksScreen} />
+      <Stack.Screen name="Panier"        component={PanierScreen} />
       <Stack.Screen name="SuiviCommande" component={SuiviCommandeScreen} />
     </Stack.Navigator>
   );
@@ -91,22 +75,19 @@ function SnacksStack() {
 function SocialStack() {
   return (
     <Stack.Navigator screenOptions={noHeader}>
-      <Stack.Screen name="Posts"       component={PostsScreen} />
-      <Stack.Screen name="CreerPost"   component={CreerPostScreen} />
-      <Stack.Screen name="Messages"    component={MessagesScreen} />
+      <Stack.Screen name="Posts"        component={PostsScreen} />
+      <Stack.Screen name="CreerPost"    component={CreerPostScreen} />
+      <Stack.Screen name="Messages"     component={MessagesScreen} />
       <Stack.Screen name="Conversation" component={ConversationScreen} />
     </Stack.Navigator>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-// Bottom tab navigator
-// ══════════════════════════════════════════════════════════════════
 const TABS = [
-  { name: 'HomeTab',     stack: HomeStack,        icon: 'home',               label: 'Accueil' },
-  { name: 'Reservation', stack: ReservationStack, icon: 'calendar',           label: 'Réserver' },
-  { name: 'Boissons',    stack: BoissonStack,     icon: 'cafe',               label: 'Boissons' },
-  { name: 'Snacks',      stack: SnacksStack,      icon: 'restaurant',         label: 'Snacks'  },
+  { name: 'HomeTab',     stack: HomeStack,        icon: 'home',                label: 'Accueil' },
+  { name: 'Reservation', stack: ReservationStack, icon: 'calendar',            label: 'Réserver' },
+  { name: 'Boissons',    stack: BoissonStack,     icon: 'cafe',                label: 'Boissons' },
+  { name: 'Snacks',      stack: SnacksStack,      icon: 'restaurant',          label: 'Snacks'  },
   { name: 'Social',      stack: SocialStack,      icon: 'chatbubble-ellipses', label: 'Social'  },
 ];
 
@@ -127,14 +108,31 @@ function MainTabNavigator() {
           tabBarLabel: tab.label,
           tabBarActiveTintColor:   COLORS.primary,
           tabBarInactiveTintColor: COLORS.gray500,
-          tabBarLabelStyle:        { fontSize: 10, fontWeight: '600', marginBottom: 4 },
-          tabBarStyle: {
-            backgroundColor: COLORS.surface,
-            borderTopWidth: 1,
-            borderTopColor: COLORS.border,
-            height: 60,
-            paddingTop: 6,
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: '600',
+            marginBottom: Platform.OS === 'ios' ? 0 : 6,
           },
+          tabBarStyle: {
+            backgroundColor:  COLORS.surface,
+            borderTopWidth:   1,
+            borderTopColor:   COLORS.border,
+            height:           TAB_BAR_HEIGHT,
+            paddingTop:       8,
+            paddingBottom:    Platform.OS === 'ios' ? 20 : 8,
+            // Clé : toujours présente, même quand clavier ouvert
+            position:         'absolute',
+            bottom:           0,
+            left:             0,
+            right:            0,
+            elevation:        8,
+            shadowColor:      '#000',
+            shadowOffset:     { width: 0, height: -2 },
+            shadowOpacity:    0.06,
+            shadowRadius:     8,
+          },
+          // Indispensable pour que le contenu ne passe pas sous la tab bar
+          tabBarHideOnKeyboard: Platform.OS === 'android',
         };
       }}
     >
@@ -145,9 +143,6 @@ function MainTabNavigator() {
   );
 }
 
-// ══════════════════════════════════════════════════════════════════
-// Root navigator — auth guard
-// ══════════════════════════════════════════════════════════════════
 export function AppNavigator() {
   const { user, loading } = useAuth();
 
@@ -160,10 +155,10 @@ export function AppNavigator() {
           <Stack.Screen name="Main" component={MainTabNavigator} />
         ) : (
           <>
-            <Stack.Screen name="Splash"      component={SplashScreen} />
-            <Stack.Screen name="Onboarding"  component={OnboardingScreen} />
-            <Stack.Screen name="Login"       component={LoginScreen} />
-            <Stack.Screen name="Register"    component={RegisterScreen} />
+            <Stack.Screen name="Splash"     component={SplashScreen} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Login"      component={LoginScreen} />
+            <Stack.Screen name="Register"   component={RegisterScreen} />
           </>
         )}
       </Stack.Navigator>
