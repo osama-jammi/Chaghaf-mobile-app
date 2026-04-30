@@ -2,13 +2,22 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, FlatList, ActivityIndicator,
+  TextInput, FlatList, ActivityIndicator, Image, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, RADIUS, TYPOGRAPHY } from '../../constants/colors';
 import { Card, Button, Header, Icon, Badge, Divider, Row } from '../../components';
 import { SnackApi } from '../../services/api';
 import { useFetch } from '../../hooks/useApi';
+
+// Helper image
+const getImageSource = (item) => {
+  if (item?.imageBase64) {
+    const mime = item.imageMimeType || 'image/jpeg';
+    return { uri: `data:${mime};base64,${item.imageBase64}` };
+  }
+  return null;
+};
 
 // ══════════════════════════════════════════════════════════════════
 // Menu snacks
@@ -18,7 +27,7 @@ export function MenuSnacksScreen({ navigation }) {
   const { data: catalog, loading, error: listError } = useFetch(SnackApi.getCatalog, []);
 
   const snacks     = catalog || [];
-  const categories = [...new Set(snacks.map(s => s.category))];
+  const categories = [...new Set(snacks.map(s => s.category).filter(Boolean))];
 
   const add    = (id) => setCart(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
   const remove = (id) => setCart(prev => {
@@ -57,67 +66,96 @@ export function MenuSnacksScreen({ navigation }) {
         <Text style={sn.partnerText}>Partenaire Chaghaf · Livraison sur place</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={sn.scroll}>
-        {listError && (
-          <View style={sn.errorBox}>
-            <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
-            <Text style={sn.errorText}>{listError}</Text>
+      {/* Contenu scrollable + bouton sticky */}
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[sn.scroll, { paddingBottom: totalItems > 0 ? 110 : 32 }]}
+        >
+          {listError && (
+            <View style={sn.errorBox}>
+              <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
+              <Text style={sn.errorText}>{listError}</Text>
+            </View>
+          )}
+
+          {loading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          ) : snacks.length === 0 && !listError ? (
+            <Text style={{ textAlign: 'center', color: COLORS.textSecondary, marginTop: 24 }}>
+              Aucun produit disponible pour le moment.
+            </Text>
+          ) : (
+            categories.map(cat => (
+              <View key={cat}>
+                <Text style={sn.catTitle}>{cat}</Text>
+                <Card padding={0}>
+                  {snacks.filter(s => s.category === cat).map((item, idx, arr) => {
+                    const imgSource = getImageSource(item);
+                    const qty       = cart[item.id] || 0;
+                    return (
+                      <View key={item.id}>
+                        <View style={sn.itemRow}>
+                          {/* Image ou icône */}
+                          <View style={sn.itemImgBox}>
+                            {imgSource ? (
+                              <Image
+                                source={imgSource}
+                                style={sn.itemImg}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Text style={sn.itemEmoji}>
+                                {item.emoji || '🍽️'}
+                              </Text>
+                            )}
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <Text style={sn.itemName}>{item.name}</Text>
+                            {item.description ? (
+                              <Text style={sn.itemDesc} numberOfLines={1}>
+                                {item.description}
+                              </Text>
+                            ) : null}
+                            <Text style={sn.itemPrice}>{item.price} dh</Text>
+                          </View>
+
+                          <View style={sn.qtyRow}>
+                            {qty > 0 && (
+                              <>
+                                <TouchableOpacity style={sn.qtyBtn} onPress={() => remove(item.id)}>
+                                  <Icon name="remove" size={14} color={COLORS.primary} />
+                                </TouchableOpacity>
+                                <Text style={sn.qtyNum}>{qty}</Text>
+                              </>
+                            )}
+                            <TouchableOpacity style={[sn.qtyBtn, sn.qtyBtnAdd]} onPress={() => add(item.id)}>
+                              <Icon name="add" size={14} color={COLORS.white} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        {idx < arr.length - 1 && <Divider inset={72} />}
+                      </View>
+                    );
+                  })}
+                </Card>
+              </View>
+            ))
+          )}
+        </ScrollView>
+
+        {/* Bouton sticky commander */}
+        {totalItems > 0 && (
+          <View style={sn.stickyFooter}>
+            <Button
+              title={`Commander · ${totalItems} article${totalItems > 1 ? 's' : ''} · ${totalPrice} dh`}
+              onPress={() => navigation.navigate('Panier', { cart, totalPrice, snacks })}
+              size="lg"
+            />
           </View>
         )}
-        {loading ? (
-          <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
-        ) : snacks.length === 0 && !listError ? (
-          <Text style={{ textAlign: 'center', color: COLORS.textSecondary, marginTop: 24 }}>
-            Aucun produit disponible pour le moment.
-          </Text>
-        ) : (
-          categories.map(cat => (
-            <View key={cat}>
-              <Text style={sn.catTitle}>{cat}</Text>
-              <Card padding={0}>
-                {snacks.filter(s => s.category === cat).map((item, idx, arr) => (
-                  <View key={item.id}>
-                    <View style={sn.itemRow}>
-                      <View style={sn.itemIconBox}>
-                        <Icon name={item.icon ?? 'restaurant-outline'} size={20} color={COLORS.textSecondary} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={sn.itemName}>{item.name}</Text>
-                        <Text style={sn.itemPrice}>{item.price} dh</Text>
-                      </View>
-                      <View style={sn.qtyRow}>
-                        {cart[item.id] ? (
-                          <>
-                            <TouchableOpacity style={sn.qtyBtn} onPress={() => remove(item.id)}>
-                              <Icon name="remove" size={14} color={COLORS.primary} />
-                            </TouchableOpacity>
-                            <Text style={sn.qtyNum}>{cart[item.id]}</Text>
-                          </>
-                        ) : null}
-                        <TouchableOpacity style={[sn.qtyBtn, sn.qtyBtnAdd]} onPress={() => add(item.id)}>
-                          <Icon name="add" size={14} color={COLORS.white} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    {idx < arr.length - 1 && <Divider inset={58} />}
-                  </View>
-                ))}
-              </Card>
-            </View>
-          ))
-        )}
-        <View style={{ height: totalItems > 0 ? 100 : 20 }} />
-      </ScrollView>
-
-      {totalItems > 0 && (
-        <View style={sn.floatingBar}>
-          <Button
-            title={`Commander · ${totalItems} article${totalItems > 1 ? 's' : ''} · ${totalPrice} dh`}
-            onPress={() => navigation.navigate('Panier', { cart, totalPrice, snacks })}
-            size="lg"
-          />
-        </View>
-      )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -164,75 +202,90 @@ export function PanierScreen({ navigation, route }) {
   return (
     <SafeAreaView style={sn.safe} edges={['top']}>
       <Header title="Mon panier" onBack={() => navigation.goBack()} />
-      <ScrollView contentContainerStyle={sn.scroll}>
 
-        {error && (
-          <View style={sn.errorBox}>
-            <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
-            <Text style={sn.errorText}>{error}</Text>
-          </View>
-        )}
+      <View style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={[sn.scroll, { paddingBottom: 120 }]}>
+          {error && (
+            <View style={sn.errorBox}>
+              <Icon name="alert-circle-outline" size={15} color={COLORS.dangerText} />
+              <Text style={sn.errorText}>{error}</Text>
+            </View>
+          )}
 
-        <Card padding={0}>
-          {items.map((item, i) => (
-            <View key={item.id}>
-              <View style={sn.panierRow}>
-                <View style={sn.itemIconBox}>
-                  <Icon name={item.icon ?? 'restaurant-outline'} size={20} color={COLORS.textSecondary} />
+          <Card padding={0}>
+            {items.map((item, i) => {
+              const imgSource = getImageSource(item);
+              return (
+                <View key={item.id}>
+                  <View style={sn.panierRow}>
+                    <View style={sn.itemImgBox}>
+                      {imgSource ? (
+                        <Image source={imgSource} style={sn.itemImg} resizeMode="cover" />
+                      ) : (
+                        <Text style={sn.itemEmoji}>{item.emoji || '🍽️'}</Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={sn.itemName}>{item.name}</Text>
+                      <Text style={sn.itemPriceSub}>{item.price} dh/unité</Text>
+                    </View>
+                    <View style={sn.qtyRow}>
+                      <TouchableOpacity style={sn.qtyBtn} onPress={() => remove(item.id)}>
+                        <Icon name="remove" size={14} color={COLORS.primary} />
+                      </TouchableOpacity>
+                      <Text style={sn.qtyNum}>{item.qty}</Text>
+                      <TouchableOpacity style={[sn.qtyBtn, sn.qtyBtnAdd]} onPress={() => add(item.id)}>
+                        <Icon name="add" size={14} color={COLORS.white} />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={sn.panierLineTotal}>{item.price * item.qty} dh</Text>
+                  </View>
+                  {i < items.length - 1 && <Divider inset={72} />}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={sn.itemName}>{item.name}</Text>
-                  <Text style={sn.itemPriceSub}>{item.price} dh/unité</Text>
-                </View>
-                <View style={sn.qtyRow}>
-                  <TouchableOpacity style={sn.qtyBtn} onPress={() => remove(item.id)}>
-                    <Icon name="remove" size={14} color={COLORS.primary} />
-                  </TouchableOpacity>
-                  <Text style={sn.qtyNum}>{item.qty}</Text>
-                  <TouchableOpacity style={[sn.qtyBtn, sn.qtyBtnAdd]} onPress={() => add(item.id)}>
-                    <Icon name="add" size={14} color={COLORS.white} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={sn.panierLineTotal}>{item.price * item.qty} dh</Text>
+              );
+            })}
+          </Card>
+
+          <Card>
+            <Text style={sn.noteLabel}>Instructions de livraison</Text>
+            <TextInput
+              style={sn.noteInput}
+              value={note}
+              onChangeText={setNote}
+              placeholder="Ex : Pas trop de sauce..."
+              placeholderTextColor={COLORS.textDisabled}
+              multiline
+            />
+          </Card>
+
+          <Card>
+            {[
+              ['Sous-total',   `${total} dh`, false],
+              ['Livraison',    'Offerte',      true ],
+              ['Délai estimé', '~10 min',      false],
+            ].map(([label, value, green]) => (
+              <View key={label} style={sn.sumRow}>
+                <Text style={sn.sumLabel}>{label}</Text>
+                <Text style={[sn.sumValue, green && { color: COLORS.success }]}>{value}</Text>
               </View>
-              {i < items.length - 1 && <Divider inset={58} />}
+            ))}
+            <View style={[sn.sumRow, sn.sumTotal]}>
+              <Text style={sn.totalLabel}>Total</Text>
+              <Text style={sn.totalValue}>{total} dh</Text>
             </View>
-          ))}
-        </Card>
+          </Card>
+        </ScrollView>
 
-        {/* Note */}
-        <Card>
-          <Text style={sn.noteLabel}>Instructions de livraison</Text>
-          <TextInput
-            style={sn.noteInput}
-            value={note}
-            onChangeText={setNote}
-            placeholder="Ex : Pas trop de sauce..."
-            placeholderTextColor={COLORS.textDisabled}
-            multiline
+        {/* Bouton sticky */}
+        <View style={sn.stickyFooter}>
+          <Button
+            title={loading ? 'Traitement…' : `Commander · ${total} dh`}
+            onPress={handleOrder}
+            loading={loading}
+            size="lg"
           />
-        </Card>
-
-        {/* Totaux */}
-        <Card>
-          {[
-            ['Sous-total',    `${total} dh`,    false],
-            ['Livraison',     'Offerte',         true],
-            ['Délai estimé',  '~10 min',         false],
-          ].map(([label, value, green]) => (
-            <View key={label} style={sn.sumRow}>
-              <Text style={sn.sumLabel}>{label}</Text>
-              <Text style={[sn.sumValue, green && { color: COLORS.success }]}>{value}</Text>
-            </View>
-          ))}
-          <View style={[sn.sumRow, sn.sumTotal]}>
-            <Text style={sn.totalLabel}>Total</Text>
-            <Text style={sn.totalValue}>{total} dh</Text>
-          </View>
-        </Card>
-
-        <Button title={`Commander · ${total} dh`} onPress={handleOrder} loading={loading} size="lg" />
-      </ScrollView>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -244,10 +297,10 @@ export function SuiviCommandeScreen({ navigation, route }) {
   const { orderId = 'CH-247', total = 72 } = route?.params || {};
 
   const steps = [
-    { id: 1, label: 'Commande reçue',     done: true,   active: false },
-    { id: 2, label: 'En préparation',     done: false,  active: true  },
-    { id: 3, label: 'En route vers vous', done: false,  active: false },
-    { id: 4, label: 'Livré à votre table',done: false,  active: false },
+    { id: 1, label: 'Commande reçue',      done: true,  active: false },
+    { id: 2, label: 'En préparation',      done: false, active: true  },
+    { id: 3, label: 'En route vers vous',  done: false, active: false },
+    { id: 4, label: 'Livré à votre table', done: false, active: false },
   ];
 
   return (
@@ -255,7 +308,6 @@ export function SuiviCommandeScreen({ navigation, route }) {
       <Header title="Suivi commande" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={sn.scroll}>
 
-        {/* Order summary */}
         <Card>
           <Row center between>
             <View>
@@ -268,7 +320,6 @@ export function SuiviCommandeScreen({ navigation, route }) {
           </Row>
         </Card>
 
-        {/* Timeline */}
         <Card>
           <Text style={sn.timelineTitle}>Statut de livraison</Text>
           {steps.map((step, i) => (
@@ -297,7 +348,6 @@ export function SuiviCommandeScreen({ navigation, route }) {
           ))}
         </Card>
 
-        {/* ETA */}
         <View style={sn.etaBar}>
           <View style={sn.etaIconBox}>
             <Icon name="time-outline" size={20} color={COLORS.primary} />
@@ -308,7 +358,6 @@ export function SuiviCommandeScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Contact */}
         <Card>
           <Text style={sn.contactTitle}>Un problème avec votre commande ?</Text>
           <TouchableOpacity style={sn.contactBtn} onPress={() => navigation.navigate('Social')}>
@@ -323,7 +372,7 @@ export function SuiviCommandeScreen({ navigation, route }) {
 
 const sn = StyleSheet.create({
   safe:       { flex: 1, backgroundColor: COLORS.bg },
-  scroll:     { padding: 16, gap: 12, paddingBottom: 32 },
+  scroll:     { padding: 16, gap: 12 },
   partnerBar: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 10, paddingHorizontal: 16,
@@ -337,11 +386,37 @@ const sn = StyleSheet.create({
   },
   errorText:  { ...TYPOGRAPHY.sm, color: COLORS.dangerText, flex: 1 },
 
-  catTitle:   { ...TYPOGRAPHY.label, color: COLORS.textTertiary, marginBottom: 8, marginTop: 4 },
-  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  itemIconBox:{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: COLORS.gray50, alignItems: 'center', justifyContent: 'center' },
-  itemName:   { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '500' },
-  itemPrice:  { ...TYPOGRAPHY.smM, color: COLORS.primary, marginTop: 2 },
+  // Sticky footer
+  stickyFooter: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+
+  catTitle:     { ...TYPOGRAPHY.label, color: COLORS.textTertiary, marginBottom: 8, marginTop: 4 },
+
+  // Item row
+  itemRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  itemImgBox:   {
+    width: 52, height: 52, borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gray50,
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  itemImg:      { width: 52, height: 52 },
+  itemEmoji:    { fontSize: 26 },
+  itemName:     { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '500' },
+  itemDesc:     { ...TYPOGRAPHY.xs, color: COLORS.textTertiary, marginTop: 2 },
+  itemPrice:    { ...TYPOGRAPHY.smM, color: COLORS.primary, marginTop: 3 },
   itemPriceSub: { ...TYPOGRAPHY.xs, color: COLORS.textTertiary, marginTop: 2 },
 
   qtyRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -349,36 +424,34 @@ const sn = StyleSheet.create({
   qtyBtnAdd: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   qtyNum:    { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, minWidth: 18, textAlign: 'center' },
 
-  cartBadge:    {
+  cartBadge:     {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: COLORS.primary, borderRadius: RADIUS.full,
     paddingHorizontal: 10, paddingVertical: 6,
   },
   cartBadgeText: { ...TYPOGRAPHY.xs, color: COLORS.white, fontWeight: '700' },
-  floatingBar:  { position: 'absolute', bottom: 20, left: 16, right: 16 },
 
   // Panier
-  panierRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  panierLineTotal:{ ...TYPOGRAPHY.bodyM, color: COLORS.primary, fontWeight: '700', minWidth: 52, textAlign: 'right' },
-  noteLabel:      { ...TYPOGRAPHY.smM, color: COLORS.textSecondary, marginBottom: 8 },
-  noteInput:      {
+  panierRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12 },
+  panierLineTotal: { ...TYPOGRAPHY.bodyM, color: COLORS.primary, fontWeight: '700', minWidth: 52, textAlign: 'right' },
+  noteLabel:       { ...TYPOGRAPHY.smM, color: COLORS.textSecondary, marginBottom: 8 },
+  noteInput:       {
     backgroundColor: COLORS.gray50, borderRadius: RADIUS.sm, padding: 12,
     ...TYPOGRAPHY.body, color: COLORS.textPrimary,
     borderWidth: 1, borderColor: COLORS.border, minHeight: 64,
     textAlignVertical: 'top',
   },
-  sumRow:         { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  sumLabel:       { ...TYPOGRAPHY.sm, color: COLORS.textSecondary },
-  sumValue:       { ...TYPOGRAPHY.smM, color: COLORS.textPrimary, fontWeight: '500' },
-  sumTotal:       { borderBottomWidth: 0, paddingTop: 12 },
-  totalLabel:     { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '600' },
-  totalValue:     { fontSize: 20, fontWeight: '700', color: COLORS.primary },
+  sumRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  sumLabel:    { ...TYPOGRAPHY.sm, color: COLORS.textSecondary },
+  sumValue:    { ...TYPOGRAPHY.smM, color: COLORS.textPrimary, fontWeight: '500' },
+  sumTotal:    { borderBottomWidth: 0, paddingTop: 12 },
+  totalLabel:  { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '600' },
+  totalValue:  { fontSize: 20, fontWeight: '700', color: COLORS.primary },
 
-  // Order
+  // Order / suivi
   orderNum:  { ...TYPOGRAPHY.bodyM, color: COLORS.textPrimary, fontWeight: '600' },
   orderTime: { ...TYPOGRAPHY.xs, color: COLORS.textTertiary, marginTop: 2 },
 
-  // Timeline
   timelineTitle: { ...TYPOGRAPHY.h4, color: COLORS.textPrimary, marginBottom: 16 },
   timelineRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 4 },
   timelineLeft:  { alignItems: 'center', width: 24 },
@@ -396,7 +469,6 @@ const sn = StyleSheet.create({
   labelDone:     { color: COLORS.successText, fontWeight: '500' },
   labelActive:   { color: COLORS.primary, fontWeight: '600' },
 
-  // ETA
   etaBar:    {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, padding: 16,
@@ -407,9 +479,8 @@ const sn = StyleSheet.create({
   etaLabel:  { ...TYPOGRAPHY.xs, color: COLORS.textTertiary },
   etaValue:  { fontSize: 18, fontWeight: '700', color: COLORS.primary, marginTop: 2 },
 
-  // Contact
-  contactTitle: { ...TYPOGRAPHY.sm, color: COLORS.textSecondary, marginBottom: 10 },
-  contactBtn:   {
+  contactTitle:   { ...TYPOGRAPHY.sm, color: COLORS.textSecondary, marginBottom: 10 },
+  contactBtn:     {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: COLORS.primarySoft, borderRadius: RADIUS.sm,
     paddingVertical: 10, paddingHorizontal: 14, alignSelf: 'flex-start',
